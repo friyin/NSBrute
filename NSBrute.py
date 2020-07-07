@@ -92,7 +92,6 @@ for o, a in opts:
 	if o in ("-h", "--help"):
 		usage()
 	elif o in ("-d", "--domain"):
-		myPrint("victim domain selected: " + a, "INFO")
 		victimDomain = a
 	elif o in ("-a", "--accessId"):
 		accessKey = a
@@ -108,6 +107,8 @@ for o, a in opts:
 
 if not victimDomain or not accessKey or not secretKey:
 	usage()
+
+myPrint("Victim domain selected: " + victimDomain, "INFO")
 
 try:
 	if not nsOverride:
@@ -125,7 +126,7 @@ try:
 		nsRecords = nsOverride
 		nsRecords_method = "manual override"
 
-	#myPrint("Detected NS records using "+nsRecords_method+": "+str(nsRecords), "INFO")
+	myPrint("Detected NS records using "+nsRecords_method, "INFO")
 except:
 	myPrint("Unable to fetch NS records for "+victimDomain+"\nPlease check the domain name and try again.","ERROR")
 	exit(1)
