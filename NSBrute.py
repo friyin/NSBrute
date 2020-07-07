@@ -77,7 +77,7 @@ try:
 		"accessId=",
 		"secretKey=",
 		"forceDelete",
-		"nsOverride"
+		"nsOverride="
 	])
 except getopt.GetoptError as err:
 	# print help information and exit:
