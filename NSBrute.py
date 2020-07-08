@@ -178,6 +178,7 @@ try:
 				print ""
 				time.sleep(0.5)
 				new_zone.delete()
+				time.sleep(0.5)
 			else:
 				myPrint("Successful attempt after "+str(counter)+" iterations.","SECURE")
 				myPrint("Check your AWS account, the work is done!","SECURE")
